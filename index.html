@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3E7BFA',
+                        macGreen: '#34C759',
+                        macGray: '#8E8E93',
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .btn-hover {
+                transition: all 0.22s ease;
+                cursor: pointer;
+            }
+            .btn-hover:active {
+                transform: scale(0.96);
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+
+            /* ========== macOS 液态玻璃【弹窗专用，强制区分深浅】 ========== */
+            .modal-container {
+                backdrop-filter: blur(28px) saturate(145%) !important;
+                -webkit-backdrop-filter: blur(28px) saturate(145%) !important;
+                box-shadow: 0 18px 50px rgba(0,0,0,0.12);
+            }
+            /* 浅色弹窗：纯白色磨砂玻璃，禁止黑色底色 */
+            .theme-light .modal-container {
+                background: rgba(255, 255, 255, 0.56) !important;
+                border: 1px solid rgba(0, 0, 0, 0.06) !important;
+            }
+            /* 深色弹窗：深色磨砂玻璃 */
+            .theme-dark .modal-container {
+                background: rgba(18, 20, 33, 0.62) !important;
+                border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            }
+
+            /* 快捷提问卡片：深浅底色永久锁定 */
+            .prompt-card {
+                transition: 0.22s ease;
+                border-radius: 999px;
+            }
+            .theme-dark .prompt-card {
+                background: rgba(255, 255, 255, 0.08) !important;
+                border: 1px solid rgba(255, 255, 255, 0.10);
+            }
+            .theme-light .prompt-card {
+                background: rgba(0, 0, 0, 0.06) !important;
+                border: 1px solid rgba(0, 0, 0, 0.08);
+            }
+            .prompt-card:hover {
+                transform: translateY(-1px);
+            }
+            .theme-dark .prompt-card:hover {
+                background: rgba(255, 255, 255, 0.13) !important;
+            }
+            .theme-light .prompt-card:hover {
+                background: rgba(0, 0, 0, 0.09) !important;
+            }
+
+            /* 侧边搜索框 */
+            .sidebar-search {
+                border-radius: 10px;
+                padding: 8px 12px;
+                transition: all 0.24s ease;
+                outline: none;
+            }
+            .theme-dark .sidebar-search {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                color: #ffffff;
+            }
+            .theme-light .sidebar-search {
+                background: rgba(0, 0, 0, 0.05);
+                border: 1px solid rgba(0, 0, 0, 0.08);
+                color: #111111;
+            }
+            .theme-dark .sidebar-search::placeholder {
+                color: rgba(255, 255, 255, 0.45);
+            }
+            .theme-light .sidebar-search::placeholder {
+                color: rgba(0, 0, 0, 0.40);
+            }
+            .theme-dark .sidebar-search:focus {
+                border-color: rgba(255, 255, 255, 0.25);
+                background: rgba(255, 255, 255, 0.11);
+            }
+            .theme-light .sidebar-search:focus {
+                border-color: rgba(0, 0, 0, 0.16);
+                background: rgba(0, 0, 0, 0.07);
+            }
+
+            /* macOS 开关【重构，整块区域可点击】 */
+            .toggle-mac {
+                width: 50px;
+                height: 28px;
+                border-radius: 999px;
+                position: relative;
+                transition: all 0.24s ease;
+                background: rgba(142, 142, 147, 0.55);
+            }
+            .toggle-mac.active {
+                background: #34C759;
+            }
+            .toggle-mac-circle {
+                width: 24px;
+                height: 24px;
+                border-radius: 999px;
+                background: #ffffff;
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.20);
+                position: absolute;
+                top: 2px;
+                left: 2px;
+                transition: left 0.24s cubic-bezier(0.2, 0, 0.2, 1);
+            }
+            .toggle-mac.active .toggle-mac-circle {
+                left: 24px;
+            }
+
+            .chat-active {
+                background-color: rgba(0, 0, 0, 0.04) !important;
+            }
+            .theme-dark .chat-active {
+                background-color: rgba(255, 255, 255, 0.06) !important;
+            }
+            .plan-active {
+                border-color: #111111 !important;
+            }
+            .theme-dark .plan-active {
+                border-color: #F7F7F7 !important;
+            }
+            .modal-enter {
+                animation: modalEnter 0.24s ease;
+            }
+            @keyframes modalEnter {
+                from { opacity: 0; transform: scale(0.96); }
+                to { opacity: 1; transform: scale(1); }
+            }
+            /* 打字机光标 */
+            .typing-cursor {
+                display: inline-block;
+                width: 6px;
+                height: 18px;
+                background: currentColor;
+                margin-left: 3px;
+                animation: blink 0.8s infinite;
+                vertical-align: text-bottom;
+            }
+            @keyframes blink {
+                0%,49% {opacity:1;}
+                50%,100% {opacity:0;}
+            }
+        }
+
+        :root {
+            --text-color: #ffffff;
+            --input-text: #ffffff;
+            --hint-text: rgba(255, 255, 255, 0.45);
+            --border-color: rgba(255, 255, 255, 0.12);
+            --ai-bubble: rgba(255, 255, 255, 0.10);
+            --user-bubble: rgba(62, 123, 250, 0.25);
+            --input-bg: rgba(44, 46, 58, 0.45);
+            --input-field-bg: transparent;
+            --body-bg: #050714;
+            --sidebar-bg: #141622;
+            --main-bg: #0c0e18;
+            --card-bg: rgba(255, 255, 255, 0.04);
+            --card-hover: rgba(255, 255, 255, 0.08);
+            --sai-text: #ffffff;
+            --login-btn-bg-dark: rgba(255, 255, 255, 0.12);
+            --login-btn-text-dark: #ffffff;
+            --login-btn-bg-light: #111111;
+            --login-btn-text-light: #ffffff;
+        }
+
+        .theme-light {
+            --text-color: #111111;
+            --input-text: #111111;
+            --hint-text: rgba(0, 0, 0, 0.45);
+            --border-color: rgba(0, 0, 0, 0.08);
+            --ai-bubble: rgba(245, 245, 247, 0.85);
+            --user-bubble: rgba(62, 123, 250, 0.16);
+            --input-bg: rgba(255, 255, 255, 0.60);
+            --input-field-bg: transparent;
+            --body-bg: #f5f6fa;
+            --sidebar-bg: #fcfcfd;
+            --main-bg: #f7f8fc;
+            --card-bg: rgba(0, 0, 0, 0.03);
+            --card-hover: rgba(0, 0, 0, 0.06);
+            --sai-text: #111111;
+        }
+
+        .txt-main { color: var(--text-color) !important; }
+        .input-text { color: var(--input-text) !important; background-color: var(--input-field-bg) !important; }
+        .txt-hint { color: var(--hint-text) !important; }
+        .border-panel { border-color: var(--border-color) !important; }
+        .bubble-ai { background: var(--ai-bubble) !important; }
+        .bubble-user { background: var(--user-bubble) !important; }
+        .input-container { background: var(--input-bg) !important; }
+        .bg-base { background-color: var(--body-bg); transition: background 0.45s ease; }
+        .sidebar-bg { background-color: var(--sidebar-bg); transition: background 0.45s ease; }
+        .main-bg { background-color: var(--main-bg); transition: background 0.45s ease; }
+        .card-bg { background-color: var(--card-bg); transition: background 0.22s ease; }
+        .card-hover:hover { background-color: var(--card-hover); }
+
+        .sai-brand {
+            color: var(--sai-text);
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            transition: color 0.45s ease;
+        }
+        .login-btn-dark {
+            background-color: var(--login-btn-bg-dark);
+            color: var(--login-btn-text-dark);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .login-btn-light {
+            background-color: var(--login-btn-bg-light);
+            color: var(--login-btn-text-light);
+        }
+        .theme-toggle-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+            transition: 0.45s ease;
+        }
+        .theme-dark .theme-toggle-icon {
+            background: linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.06));
+        }
+        .theme-light .theme-toggle-icon {
+            background: linear-gradient(135deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02));
+        }
+        textarea {
+            resize: none;
+        }
+    </style>
+</head>
+<body class="m-0 p-0 overflow-hidden w-screen h-screen font-sans bg-base theme-dark">
+<div id="chatPage" class="page active flex h-full overflow-hidden">
+    <aside class="w-[260px] sidebar-bg flex flex-col p-4 shrink-0 border-r border-panel h-full">
+        <div class="flex items-center gap-3 mb-4 px-2">
+            <h1 class="text-xl font-semibold tracking-wide sai-brand">SAI</h1>
+        </div>
+        <div class="mb-5 px-2">
+            <input id="sidebarSearchInput" type="text" class="sidebar-search w-full text-sm" placeholder="搜索内容，回车跳转必应">
+        </div>
+        <div class="space-y-1.5">
+            <div onclick="newChat()" class="py-2.5 px-3 rounded-lg chat-item cursor-pointer btn-hover flex items-center gap-3 chat-active txt-main">
+                <i class="fa fa-pencil-square-o"></i>
+                <span>新对话</span>
+                <span class="ml-auto text-xs txt-hint">Ctrl K</span>
+            </div>
+            <div onclick="switchChat(2)" data-cid="2" class="py-2.5 px-3 rounded-lg hover:card-bg card-hover chat-item cursor-pointer btn-hover flex items-center gap-3 txt-main">
+                <i class="fa fa-briefcase"></i>
+                <span>新办公任务</span>
+            </div>
+            <div onclick="switchChat(3)" data-cid="3" class="py-2.5 px-3 rounded-lg hover:card-bg card-hover chat-item cursor-pointer btn-hover flex items-center gap-3 txt-main">
+                <i class="fa fa-magic"></i>
+                <span>AI创作</span>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto scrollbar-hide mt-6 space-y-1">
+            <div onclick="switchChat(1)" data-cid="1" class="chat-item py-2.5 px-3 rounded-lg hover:card-bg card-hover cursor-pointer btn-hover txt-main">
+                <i class="fa fa-comments-o mr-2 opacity-70"></i>初次对话
+            </div>
+        </div>
+        <div class="mt-auto pt-4 border-t border-panel space-y-1">
+            <button onclick="toggleTheme()" class="w-full text-left py-2.5 px-3 rounded-lg hover:card-bg card-hover flex items-center gap-2 btn-hover txt-main">
+                <div class="theme-toggle-icon">
+                    <i class="fa fa-moon-o" id="themeIcon"></i>
+                </div>
+                <span id="themeBtnText">切换至浅色模式</span>
+            </button>
+            <button onclick="openSetting()" class="w-full text-left py-2.5 px-3 rounded-lg hover:card-bg card-hover flex items-center gap-2 btn-hover txt-main">
+                <i class="fa fa-cog"></i>设置
+            </button>
+            <button onclick="openAbout()" class="w-full text-left py-2.5 px-3 rounded-lg hover:card-bg card-hover flex items-center gap-2 btn-hover txt-main">
+                <i class="fa fa-info-circle"></i>
+                <span>关于 SAI</span>
+            </button>
+        </div>
+    </aside>
+    <main class="flex-1 flex flex-col main-bg h-full overflow-hidden">
+        <div class="h-[60px] flex items-center justify-between px-6 border-b border-panel shrink-0">
+            <h2 class="font-medium txt-main" id="chatTitle">新对话</h2>
+            <div class="flex gap-3 items-center">
+                <button onclick="openApiSetting()" class="w-9 h-9 rounded-lg hover:card-bg card-hover flex items-center justify-center btn-hover txt-main" title="API配置">
+                    <i class="fa fa-key"></i>
+                </button>
+                <div id="loginWrap">
+                    <button onclick="openLogin()" id="loginBtn" class="login-btn-dark px-5 py-2 rounded-full btn-hover text-sm font-medium">
+                        <i class="fa fa-user mr-1"></i>登录
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6 scrollbar-hide h-0" id="chatBox">
+            <div id="welcomeHome" class="w-full max-w-[900px] mx-auto text-center pt-[40px]">
+                <h1 class="text-[clamp(26px,4vw,36px)] font-bold txt-main mb-10">有什么我能帮你的吗？</h1>
+                <div class="flex flex-wrap justify-center gap-3 px-4">
+                    <div onclick="quickSend('资讯：台风“巴威”加强至14级多地将迎强降雨')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">资讯：台风“巴威”加强至14级多地将迎强降雨</div>
+                    <div onclick="quickSend('帮我设计一个可爱的像素小人头像吧')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">帮我设计一个可爱的像素小人头像吧</div>
+                    <div onclick="quickSend('人的一生能遇见多少人')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">人的一生能遇见多少人</div>
+                    <div onclick="quickSend('每天睡够几小时才算睡眠充足？')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">每天睡够几小时才算睡眠充足？</div>
+                    <div onclick="quickSend('一吨100元和100吨1元哪个更值钱？')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">一吨100元和100吨1元哪个更值钱？</div>
+                    <div onclick="quickSend('资讯：阿根廷主帅回应争议称绝不存在裁判偏袒')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">资讯：阿根廷主帅回应争议称绝不存在裁判偏袒</div>
+                    <div onclick="quickSend('如何训练自己的AI模型？')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">如何训练自己的AI模型？</div>
+                    <div onclick="quickSend('想象十年后的自己是什么样的？')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">想象十年后的自己是什么样的？</div>
+                    <div onclick="quickSend('为什么一年有 365 天或 366 天？')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">为什么一年有 365 天或 366 天？</div>
+                </div>
+            </div>
+        </div>
+        <div class="p-5 shrink-0 w-full max-w-[1000px] mx-auto">
+            <div class="input-container rounded-2xl p-4">
+                <textarea id="userInput" rows="2" placeholder="发消息..." class="w-full bg-transparent outline-none resize-none input-text placeholder:text-opacity-40"></textarea>
+                <div class="flex justify-between items-center mt-3">
+                    <div class="flex gap-x-2 flex-wrap items-center">
+                        <button onclick="tipFeature('添加')" class="btn-hover input-text opacity-80 hover:opacity-100 text-sm flex items-center gap-1 px-1"><i class="fa fa-plus"></i></button>
+                        <button onclick="tipFeature('快速')" class="btn-hover input-text opacity-80 hover:opacity-100 text-sm flex items-center gap-1 px-1"><i class="fa fa-bolt"></i>快速</button>
+                        <button onclick="tipFeature('PPT生成')" class="btn-hover input-text opacity-80 hover:opacity-100 text-sm flex items-center gap-1 px-1"><i class="fa fa-file-powerpoint-o"></i>PPT生成</button>
+                        <button onclick="tipFeature('图像生成')" class="btn-hover input-text opacity-80 hover:opacity-100 text-sm flex items-center gap-1 px-1"><i class="fa fa-picture-o"></i>图像生成</button>
+                        <button onclick="tipFeature('帮我写作')" class="btn-hover input-text opacity-80 hover:opacity-100 text-sm flex items-center gap-1 px-1"><i class="fa fa-pencil"></i>帮我写作</button>
+                        <button onclick="tipFeature('视频生成')" class="btn-hover input-text opacity-80 hover:opacity-100 text-sm flex items-center gap-1 px-1"><i class="fa fa-video-camera"></i>视频生成</button>
+                        <button onclick="tipFeature('翻译')" class="btn-hover input-text opacity-80 hover:opacity-100 text-sm flex items-center gap-1 px-1"><i class="fa fa-language"></i>翻译</button>
+                        <button onclick="tipFeature('深入研究')" class="btn-hover input-text opacity-80 hover:opacity-100 text-sm flex items-center gap-1 px-1"><i class="fa fa-search"></i>深入研究</button>
+                        <button onclick="tipFeature('录音转写')" class="btn-hover input-text opacity-80 hover:opacity-100 text-sm flex items-center gap-1 px-1"><i class="fa fa-microphone"></i>录音转写</button>
+                        <button onclick="tipFeature('更多')" class="btn-hover input-text opacity-80 hover:opacity-100 text-sm flex items-center gap-1 px-1"><i class="fa fa-th"></i>更多</button>
+                    </div>
+                    <button onclick="sendMessage()" class="bg-primary w-10 h-10 rounded-full text-white btn-hover flex items-center justify-center shrink-0 ml-3">
+                        <i class="fa fa-paper-plane-o"></i>
+                    </button>
+                </div>
+            </div>
+            <p class="text-center text-xs mt-3 txt-hint">SAI 可能会产生错误内容，请核实相关信息</p>
+        </div>
+    </main>
+</div>
+
+<!--弹窗区域-->
+<div id="loginModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50 modal-bg">
+    <div class="w-[420px] rounded-3xl p-6 modal-container modal-enter">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-semibold txt-main">登录 SAI</h3>
+            <button onclick="closeLogin()" class="w-7 h-7 rounded-full hover:card-bg card-hover btn-hover flex items-center justify-center txt-main"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="space-y-4">
+            <input id="loginUserName" type="text" placeholder="用户名" class="w-full bg-white/10 rounded-xl px-4 py-3 outline-none focus:ring-1 ring-primary input-text">
+            <input type="password" placeholder="密码" class="w-full bg-white/10 rounded-xl px-4 py-3 outline-none focus:ring-1 ring-primary input-text">
+            <div class="flex justify-between text-sm txt-main opacity-80">
+                <label><input type="checkbox"> 记住登录</label>
+                <a onclick="findPassword()" class="hover:underline cursor-pointer">忘记密码？</a>
+            </div>
+            <button onclick="loginSuccess()" class="w-full bg-primary py-3 rounded-xl font-medium btn-hover mt-2 text-white">立即登录</button>
+            <div class="text-center text-sm txt-main opacity-70">没有账号？<a onclick="openRegister()" class="text-primary hover:underline cursor-pointer">注册账号</a></div>
+        </div>
+    </div>
+</div>
+<div id="registerModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50 modal-bg">
+    <div class="w-[440px] rounded-3xl p-6 modal-container modal-enter">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-semibold txt-main">注册 SAI</h3>
+            <button onclick="closeRegister()" class="w-7 h-7 rounded-full hover:card-bg card-hover btn-hover flex items-center justify-center txt-main"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="flex mb-5">
+            <button id="tabPhone" onclick="switchRegTab('phone')" class="flex-1 py-2 border-b-2 border-primary txt-main">手机号注册</button>
+            <button id="tabEmail" onclick="switchRegTab('email')" class="flex-1 py-2 border-b-2 border-transparent txt-main opacity-50">邮箱注册</button>
+        </div>
+        <div id="regPhonePanel" class="space-y-4">
+            <input type="text" placeholder="请输入手机号码" class="w-full bg-white/10 rounded-xl px-4 py-3 outline-none input-text">
+            <input type="text" placeholder="验证码" class="w-full bg-white/10 rounded-xl px-4 py-3 outline-none input-text">
+            <input type="password" placeholder="设置登录密码" class="w-full bg-white/10 rounded-xl px-4 py-3 outline-none input-text">
+        </div>
+        <div id="regEmailPanel" class="space-y-4 hidden">
+            <input type="text" placeholder="请输入邮箱地址" class="w-full bg-white/10 rounded-xl px-4 py-3 outline-none input-text">
+            <input type="text" placeholder="验证码" class="w-full bg-white/10 rounded-xl px-4 py-3 outline-none input-text">
+            <input type="password" placeholder="设置登录密码" class="w-full bg-white/10 rounded-xl px-4 py-3 outline-none input-text">
+        </div>
+        <button onclick="registerSuccess()" class="w-full bg-primary py-3 rounded-xl font-medium btn-hover mt-4 text-white">完成注册</button>
+    </div>
+</div>
+<div id="settingModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50 modal-bg">
+    <div class="w-[480px] rounded-3xl p-6 modal-container modal-enter">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-semibold txt-main">设置</h3>
+            <button onclick="closeSetting()" class="w-7 h-7 rounded-full hover:card-bg card-hover btn-hover flex items-center justify-center txt-main"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="space-y-5 txt-main">
+            <div class="flex justify-between items-center py-3 px-3 rounded-xl card-bg card-hover">
+                <span>自动清除历史记录</span>
+                <div class="toggle-mac" onclick="toggleSwitch(this)">
+                    <div class="toggle-mac-circle"></div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center py-3 px-3 rounded-xl card-bg card-hover">
+                <span>消息自动朗读</span>
+                <div class="toggle-mac" onclick="toggleSwitch(this)">
+                    <div class="toggle-mac-circle"></div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center py-3 px-3 rounded-xl card-bg card-hover">
+                <span>联网搜索（增强信息）</span>
+                <div class="toggle-mac active" onclick="toggleSwitch(this)">
+                    <div class="toggle-mac-circle"></div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center py-3 px-3 rounded-xl card-bg card-hover">
+                <span>流式输出回复</span>
+                <div class="toggle-mac" onclick="toggleSwitch(this)">
+                    <div class="toggle-mac-circle"></div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center py-3 px-3 rounded-xl card-bg card-hover">
+                <span>保存对话本地缓存</span>
+                <div class="toggle-mac active" onclick="toggleSwitch(this)">
+                    <div class="toggle-mac-circle"></div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center py-3 px-3 rounded-xl card-bg card-hover">
+                <span>音效提醒</span>
+                <div class="toggle-mac" onclick="toggleSwitch(this)">
+                    <div class="toggle-mac-circle"></div>
+                </div>
+            </div>
+            <div class="pt-4 border-t border-panel opacity-60 text-sm">SAI</div>
+        </div>
+    </div>
+</div>
+<div id="apiModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50 modal-bg">
+    <div class="w-[480px] rounded-3xl p-6 modal-container modal-enter">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-semibold txt-main">API 参数配置</h3>
+            <button onclick="closeApiSetting()" class="w-7 h-7 rounded-full hover:card-bg card-hover btn-hover flex items-center justify-center txt-main"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="space-y-4">
+            <label class="txt-main block">选择接口类型</label>
+            <select id="apiType" class="w-full bg-white/10 rounded-xl px-4 py-3 input-text">
+                <option value="openai">OpenAI API</option>
+                <option value="deepseek">DeepSeek API</option>
+            </select>
+            <input id="apiKeyValue" type="text" placeholder="API Key" class="w-full bg-white/10 rounded-xl px-4 py-3 outline-none input-text">
+            <input type="text" placeholder="自定义接口地址（可选）" class="w-full bg-white/10 rounded-xl px-4 py-3 outline-none input-text">
+            <button onclick="saveApi()" class="w-full bg-primary py-3 rounded-xl font-medium btn-hover mt-3 text-white">保存配置</button>
+        </div>
+    </div>
+</div>
+<div id="aboutModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50 modal-bg">
+    <div class="w-[520px] rounded-3xl p-6 modal-container modal-enter">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-semibold txt-main">关于 SAI</h3>
+            <button onclick="closeAbout()" class="w-7 h-7 rounded-full hover:card-bg card-hover btn-hover flex items-center justify-center txt-main"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="space-y-4 txt-main text-sm leading-relaxed">
+            <div class="mb-2">
+                <div class="text-lg font-semibold sai-brand">SAI</div>
+                <div class="txt-hint">由 SHITOU 石头科技打造</div>
+            </div>
+            <p>SAI 是 SHITOU 石头科技旗下的 AI 产品，依托大模型底座，为用户提供智能对话、内容创作、方案策划、逻辑分析等能力。</p>
+            <p>SAI 功能仍在持续优化中，部分能力可能存在不稳定或提示限制。</p>
+            <div class="pt-3 border-t border-panel text-xs txt-hint space-y-1">
+                <p>产品名称：SAI</p>
+                <p>出品方：SHITOU 石头科技</p>
+                <p>备案号：苏ICP备2026AI0088号-1A</p>
+                <p>公安备案号：苏公网安备32010002012345号</p>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="userDropMenu" class="absolute hidden z-[60] rounded-xl p-3 modal-container w-[220px]">
+    <button onclick="logoutAccount()" class="w-full text-left py-2 px-2 rounded-lg hover:card-bg card-hover txt-main btn-hover flex items-center gap-2">
+        <i class="fa fa-sign-out"></i>退出登录
+    </button>
+</div>
+
+<script>
+let isDarkMode = true;
+let apiKey = "";
+let loginUserName = "";
+
+//侧边搜索回车跳转必应深色页面
+const searchInput = document.getElementById('sidebarSearchInput');
+searchInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){
+        let keyword = this.value.trim();
+        if(keyword){
+            window.open(`https://www.bing.com/search?q=${encodeURIComponent(keyword)}&mkt=zh-CN&dark=1`,"_blank");
+        }
+    }
+})
+
+//开关切换函数
+function toggleSwitch(el){
+    el.classList.toggle('active');
+}
+
+function tipFeature(name){
+    alert(`该版本为测试版，暂不支持【${name}】功能`);
+}
+function quickSend(text){
+    document.getElementById("userInput").value = text;
+    document.getElementById("userInput").focus();
+}
+function htmlEscape(str){
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+}
+function htmlUnEscape(str){
+    return str.replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">");
+}
+function findPassword(){
+    let randomPwd = "";
+    const chars = "0123456789abcdefghijklmnopqrstuvwxyz";
+    for(let i=0;i<8;i++) randomPwd += chars[Math.floor(Math.random()*chars.length)];
+    alert("已随机生成临时密码："+randomPwd+"\n请使用该密码登录");
+}
+
+function openAbout(){document.getElementById("aboutModal").style.display = 'flex';}
+function closeAbout(){document.getElementById("aboutModal").style.display = 'none';}
+function openLogin(){document.getElementById('loginModal').style.display = 'flex';}
+function closeLogin(){document.getElementById('loginModal').style.display = 'none';}
+function openRegister(){closeLogin();document.getElementById('registerModal').style.display = 'flex';}
+function closeRegister(){document.getElementById('registerModal').style.display = 'none';}
+function openSetting(){document.getElementById('settingModal').style.display = 'flex';}
+function closeSetting(){document.getElementById('settingModal').style.display = 'none';}
+function openApiSetting(){document.getElementById('apiModal').style.display = 'flex';}
+function closeApiSetting(){document.getElementById('apiModal').style.display = 'none';}
+
+function loginSuccess(){
+    const nameInput = document.getElementById("loginUserName").value.trim();
+    if(nameInput==""){alert("请输入用户名");return;}
+    loginUserName = nameInput;
+    const loginDomWrap = document.getElementById("loginWrap");
+    loginDomWrap.innerHTML = `
+        <div class="relative">
+            <button onclick="toggleUserMenu(event)" class="login-btn-dark px-4 py-2 rounded-full btn-hover flex items-center gap-2 text-sm font-medium">
+                <span class="sai-brand font-bold">${htmlEscape(loginUserName.charAt(0))}</span>
+                <span>${htmlEscape(loginUserName)}</span>
+                <i class="fa fa-chevron-down ml-1 opacity-70 text-xs"></i>
+            </button>
+        </div>
+    `;
+    alert("登录成功！");
+    closeLogin();
+}
+function toggleUserMenu(e){
+    e.stopPropagation();
+    const menu = document.getElementById('userDropMenu');
+    const btnRect = e.currentTarget.getBoundingClientRect();
+    menu.style.left = btnRect.left + "px";
+    menu.style.top = (btnRect.bottom + 8) + "px";
+    menu.classList.toggle('hidden');
+}
+function logoutAccount(){
+    loginUserName = "";
+    document.getElementById("userDropMenu").classList.add('hidden');
+    const loginDomWrap = document.getElementById("loginWrap");
+    loginDomWrap.innerHTML = `<button onclick="openLogin()" id="loginBtn" class="login-btn-dark px-5 py-2 rounded-full btn-hover text-sm font-medium"><i class="fa fa-user mr-1"></i>登录</button>`;
+    alert("已退出登录");
+}
+document.addEventListener('click',function(){document.getElementById('userDropMenu').classList.add('hidden');})
+
+function switchRegTab(type){
+    const phonePanel = document.getElementById('regPhonePanel');
+    const emailPanel = document.getElementById('regEmailPanel');
+    const tabP = document.getElementById('tabPhone');
+    const tabE = document.getElementById('tabEmail');
+    if(type === 'phone'){
+        phonePanel.classList.remove('hidden');emailPanel.classList.add('hidden');
+        tabP.className = "flex-1 py-2 border-b-2 border-primary txt-main";
+        tabE.className = "flex-1 py-2 border-b-2 border-transparent txt-main opacity-50";
+    }else{
+        phonePanel.classList.add('hidden');emailPanel.classList.remove('hidden');
+        tabP.className = "flex-1 py-2 border-b-2 border-transparent txt-main opacity-50";
+        tabE.className = "flex-1 py-2 border-b-2 border-primary txt-main";
+    }
+}
+function registerSuccess(){alert("注册成功，请前往登录！");closeRegister();}
+function saveApi(){apiKey = document.getElementById("apiKeyValue").value.trim();alert("API配置保存成功！");closeApiSetting();}
+function clearActiveChat(){document.querySelectorAll('.chat-item').forEach(item=>item.classList.remove('chat-active'));}
+
+function newChat(){
+    clearActiveChat();
+    document.getElementById('chatTitle').innerText = "新对话";
+    const chatWrap = document.getElementById('chatBox');
+    chatWrap.innerHTML = `
+        <div id="welcomeHome" class="w-full max-w-[900px] mx-auto text-center pt-[40px]">
+            <h1 class="text-[clamp(26px,4vw,36px)] font-bold txt-main mb-10">有什么我能帮你的吗？</h1>
+            <div class="flex flex-wrap justify-center gap-3 px-4">
+                <div onclick="quickSend('资讯：台风“巴威”加强至14级多地将迎强降雨')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">资讯：台风“巴威”加强至14级多地将迎强降雨</div>
+                <div onclick="quickSend('帮我设计一个可爱的像素小人头像吧')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">帮我设计一个可爱的像素小人头像吧</div>
+                <div onclick="quickSend('人的一生能遇见多少人')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">人的一生能遇见多少人</div>
+                <div onclick="quickSend('每天睡够几小时才算睡眠充足？')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">每天睡够几小时才算睡眠充足？</div>
+                <div onclick="quickSend('一吨100元和100吨1元哪个更值钱？')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">一吨100元和100吨1元哪个更值钱？</div>
+                <div onclick="quickSend('资讯：阿根廷主帅回应争议称绝不存在裁判偏袒')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">资讯：阿根廷主帅回应争议称绝不存在裁判偏袒</div>
+                <div onclick="quickSend('如何训练自己的AI模型？')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">如何训练自己的AI模型？</div>
+                <div onclick="quickSend('想象十年后的自己是什么样的？')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">想象十年后的自己是什么样的？</div>
+                <div onclick="quickSend('为什么一年有 365 天或 366 天？')" class="prompt-card px-4 py-2.5 text-sm txt-main btn-hover">为什么一年有 365 天或 366 天？</div>
+            </div>
+        </div>
+    `;
+}
+function switchChat(id){
+    clearActiveChat();
+    document.querySelector(`.chat-item[data-cid="${id}"]`).classList.add('chat-active');
+    const titles = {1:"初次对话",2:"新办公任务",3:"AI创作"};
+    document.getElementById('chatTitle').innerText = titles[id];
+    const chatWrap = document.getElementById('chatBox');
+    chatWrap.innerHTML = `
+        <div class="flex gap-4 mb-6">
+            <div class="w-9 h-9 flex items-center justify-center font-bold sai-brand shrink-0">SAI</div>
+            <div class="bubble-ai rounded-2xl rounded-tl-md px-5 py-4 max-w-[75%] txt-main">
+                <p>当前打开【${htmlEscape(titles[id])}】会话，开始提问吧。</p>
+            </div>
+        </div>
+    `;
+}
+
+// 打字机输出封装
+async function typeWriter(el, text, speed=30){
+    const pDom = el.querySelector('p');
+    pDom.innerHTML = `<span class="typing-cursor"></span>`;
+    let content = "";
+    for(let char of text){
+        await new Promise(res=>setTimeout(res,speed));
+        content += char;
+        pDom.innerHTML = htmlEscape(content).replaceAll("\n","<br>") + `<span class="typing-cursor"></span>`;
+        const chatBox = document.getElementById("chatBox");
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+    //打字完成移除光标
+    pDom.innerHTML = htmlEscape(content).replaceAll("\n","<br>");
+}
+
+async function sendMessage(){
+    const input = document.getElementById('userInput');
+    const text = input.value.trim();
+    if(!text) return;
+    const chatWrap = document.getElementById('chatBox');
+    if(document.getElementById("welcomeHome")) chatWrap.innerHTML = "";
+    const safeText = htmlEscape(text).replaceAll("\n","<br>");
+    //用户消息
+    chatWrap.innerHTML += `
+    <div class="flex gap-4 mb-6 justify-end msg-user">
+        <div class="bubble-user rounded-2xl rounded-tr-md px-5 py-4 max-w-[75%] txt-main">
+            <p>${safeText}</p>
+        </div>
+        <div class="w-9 h-9 rounded-xl bg-gray-500 shrink-0 flex items-center justify-center text-white">U</div>
+    </div>`;
+    input.value = "";
+    chatWrap.scrollTop = chatWrap.scrollHeight;
+
+    //AI气泡占位
+    const aiWrap = document.createElement("div");
+    aiWrap.className = "flex gap-4 mb-6 msg-ai";
+    aiWrap.innerHTML = `
+        <div class="w-9 h-9 flex items-center justify-center font-bold sai-brand shrink-0">SAI</div>
+        <div class="bubble-ai rounded-2xl rounded-tl-md px-5 py-4 max-w-[75%] txt-main">
+            <p></p>
+        </div>
+    `;
+    chatWrap.appendChild(aiWrap);
+    chatWrap.scrollTop = chatWrap.scrollHeight;
+
+    //模拟延迟
+    await new Promise(res=>setTimeout(res,600));
+    let replyText = "";
+    if(apiKey == ""){
+        replyText = "未激活，请前往顶部API设置填入有效的API密钥。\n支持 OpenAI / DeepSeek 标准接口格式。";
+    }else{
+        replyText = "收到你的问题："+htmlUnEscape(text)+"\n模拟流式输出测试成功！\n后续对接真实API即可正常对话。";
+    }
+    await typeWriter(aiWrap, replyText,35);
+}
+
+document.getElementById("userInput").addEventListener("keydown",function(e){
+    if(e.key === 'Enter' && !e.shiftKey){
+        e.preventDefault();
+        sendMessage();
+    }
+})
+
+//主题切换
+function toggleTheme(){
+    isDarkMode = !isDarkMode;
+    const icon = document.getElementById("themeIcon");
+    const btnText = document.getElementById("themeBtnText");
+    const loginBtn = document.getElementById("loginBtn");
+    if(isDarkMode){
+        icon.className = "fa fa-moon-o";
+        btnText.innerText = "切换至浅色模式";
+        document.body.classList.remove('theme-light');
+        document.body.classList.add('theme-dark');
+        loginBtn.className = "login-btn-dark px-5 py-2 rounded-full btn-hover text-sm font-medium";
+    }else{
+        icon.className = "fa fa-sun-o";
+        btnText.innerText = "切换至深色模式";
+        document.body.classList.remove('theme-dark');
+        document.body.classList.add('theme-light');
+        loginBtn.className = "login-btn-light px-5 py-2 rounded-full btn-hover text-sm font-medium";
+    }
+}
+
+//点击弹窗背景关闭弹窗
+document.querySelectorAll('.modal-bg').forEach(bg=>{
+    bg.addEventListener('click',e=>{
+        if(e.target === bg){
+            bg.style.display = "none";
+        }
+    })
+})
+</script>
+</body>
+</html>
